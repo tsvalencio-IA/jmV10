@@ -1,0 +1,10 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Smoke</title></head><body>RUNNING
+<script src="../js/insurance-parser.js"></script>
+<script>
+try {
+ const sample = `Finalizado\nSituação\nR$ 807,00\nValor Total\nOrigem\nEstrada X, Tanabi - SP\nDestino\nRua Thessalônico Barbosa, 400, Distrito Industrial, São José do Rio Preto\nEstrada X, Tanabi - SP\nTarifas\nSAIDA Maxpar R$ 807,00 1 R$ 807,00\nTotal R$ 807,00`;
+ const d=JM.insuranceParser.parse(sample);
+ const ok=d.totalValue===807 && /Rio Preto/.test(d.destination.searchAddress) && !/Tanabi/.test(d.destination.searchAddress);
+ document.body.textContent=ok?'BROWSER_SMOKE_PASS':'BROWSER_SMOKE_FAIL '+JSON.stringify(d);
+} catch(e) { document.body.textContent='BROWSER_SMOKE_ERROR '+e.stack; }
+</script></body></html>

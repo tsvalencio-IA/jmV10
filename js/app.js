@@ -10,7 +10,7 @@
   const { auth, secondaryAuth, db, ts, arrayUnion, emailIsAdmin, getRealtimeDb, rtdbKey } = window.JM.firebase;
   const cfg = window.JM_CONFIG || {};
   const SYSTEM_SIGNATURE = "";
-  const LOGIN_FLOW_VERSION = "jm-v32-1-senior-hotfix-motorista-evidencias";
+  const LOGIN_FLOW_VERSION = "jm-v32-3-final-consolidada";
   let trackerTimer = null;
   let trackerBusy = false;
   let mapRefreshTimer = null;
@@ -270,6 +270,10 @@
       provider: address.provider || "",
       raw: address.raw || "",
       externalUrl: address.externalUrl || "",
+      country: address.country || address.countryCode || "",
+      state: address.state || "",
+      city: address.city || "",
+      confidence: Number(address.confidence || 0),
       resolvedAt: address.resolvedAt || ""
     };
   }
@@ -1393,6 +1397,11 @@
       coords: point,
       placeId: address && address.placeId || "",
       source: address && address.source || "manual",
+      provider: address && address.provider || "",
+      country: address && (address.country || address.countryCode) || "",
+      state: address && address.state || "",
+      city: address && address.city || "",
+      confidence: Number(address && address.confidence || 0),
       resolvedAt: address && address.resolvedAt || new Date().toISOString()
     };
     state.addresses[kind] = normalized;
@@ -1498,6 +1507,47 @@
     }
   }
 
+  function candidateIdentity(candidate) {
+    return [candidate && candidate.city || "", candidate && candidate.state || "", candidate && candidate.label || ""]
+      .join("|")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  }
+
+  function needsCandidateChoice(candidates) {
+    if (!Array.isArray(candidates) || candidates.length < 2) return false;
+    const first = candidates[0];
+    const firstIdentity = candidateIdentity(first);
+    return candidates.slice(1, 5).some((candidate) => {
+      if (candidateIdentity(candidate) === firstIdentity) return false;
+      const cityDifferent = String(candidate.city || "").toLowerCase() !== String(first.city || "").toLowerCase();
+      const stateDifferent = String(candidate.state || "").toUpperCase() !== String(first.state || "").toUpperCase();
+      const a = usefulPoint(first.coords);
+      const b = usefulPoint(candidate.coords);
+      const farApart = a && b && window.JM.utils.haversineKm ? window.JM.utils.haversineKm(a, b) > 8 : true;
+      return cityDifferent || stateDifferent || farApart;
+    });
+  }
+
+  function chooseAddressCandidate(candidates, kind) {
+    const list = Array.isArray(candidates) ? candidates.filter(Boolean).slice(0, 5) : [];
+    if (!list.length) return null;
+    if (!needsCandidateChoice(list)) return list[0];
+    const title = kind === "origin" ? "ORIGEM" : "DESTINO";
+    const options = list.map((candidate, index) => {
+      const locality = [candidate.city, candidate.state].filter(Boolean).join("/");
+      return (index + 1) + " - " + candidate.label + (locality ? " [" + locality + "]" : "");
+    }).join("\n\n");
+    const answer = window.prompt(
+      title + " AMBÍGUO\n\nEncontramos mais de um endereço válido no Brasil. Digite o número correto:\n\n" + options,
+      "1"
+    );
+    if (answer == null) return null;
+    const index = Math.max(0, Math.min(list.length - 1, Number.parseInt(answer, 10) - 1));
+    return list[Number.isFinite(index) ? index : 0];
+  }
+
   async function geocodeAddress(kind) {
     const gm = window.JM.googleMaps;
     const isOrigin = kind === "origin";
@@ -1505,15 +1555,25 @@
     const statusId = isOrigin ? "originGeoStatus" : "destGeoStatus";
     const value = $(labelId).value.trim();
     try {
-      if (!gm) throw new Error("Busca de mapa indisponivel nesta tela.");
-      if (!value) throw new Error("Digite um endereco com cidade/UF, cole um link do mapa ou informe coordenadas.");
-      addressStatus(statusId, "Buscando endereco e coordenadas...", "muted");
-      const addr = await gm.geocode(value, activeMapSettings());
+      if (!gm) throw new Error("Busca de mapa indisponível nesta tela.");
+      if (!value) throw new Error("Digite um endereço com cidade/UF, cole um link do mapa ou informe coordenadas.");
+      addressStatus(statusId, "Buscando somente endereços válidos no Brasil...", "muted");
+      const candidates = typeof gm.geocodeCandidates === "function"
+        ? await gm.geocodeCandidates(value, activeMapSettings())
+        : [await gm.geocode(value, activeMapSettings())];
+      const addr = chooseAddressCandidate(candidates, kind);
+      if (!addr) throw new Error("Busca cancelada. Nenhum endereço foi aplicado.");
+      const countryCode = String(addr.countryCode || addr.country || "").toLowerCase();
+      if (countryCode && countryCode !== "br") throw new Error("O endereço encontrado está fora do Brasil e foi rejeitado.");
+      if (gm.isBrazilPoint && !gm.isBrazilPoint(addr.coords)) throw new Error("As coordenadas encontradas estão fora dos limites do Brasil.");
       setAddress(kind, addr);
-      toast((isOrigin ? "Origem" : "Destino") + " validado com coordenadas.", "ok");
+      const locality = [addr.city, addr.state].filter(Boolean).join("/");
+      toast((isOrigin ? "Origem" : "Destino") + " validado no Brasil" + (locality ? ": " + locality : "."), "ok");
+      return addr;
     } catch (err) {
       addressStatus(statusId, err.message, "danger");
       toast(err.message, "danger");
+      return null;
     }
   }
 
@@ -4038,10 +4098,14 @@ Rota: ${url}`;
   }
 
   function aiDetectInsurance(raw, lines) {
-    if (/maxpar/i.test(raw)) return "Maxpar";
+    const explicitClient = aiValue(lines, ["cliente"]);
+    const explicitInsurance = aiValue(lines, ["seguradora", "assistência", "assistencia"]);
+    if (explicitInsurance) return explicitInsurance;
+    if (explicitClient && /segur|assist|prote[cç][aã]o|clube|benef[ií]cio/i.test(explicitClient)) return explicitClient;
     if (/amparo\s+assist/i.test(raw)) return "Amparo Assistência";
     if (/veniti/i.test(raw)) return "Veniti";
-    return aiValue(lines, ["seguradora", "assistência", "assistencia", "cliente"]) || "";
+    if (/maxpar/i.test(raw) && !explicitClient) return "Maxpar";
+    return explicitClient || "";
   }
 
   function aiQuestions(lines) {
@@ -4100,37 +4164,65 @@ Rota: ${url}`;
 
   function aiBuildInsuranceCall(raw) {
     const lines = aiLines(raw);
-    const insurance = aiDetectInsurance(raw, lines);
-    const protocol = aiValue(lines, ["protocolo", "ordem de serviço", "ordem de servico", "os"]) ||
+    const structured = window.JM.insuranceParser && typeof window.JM.insuranceParser.parse === "function"
+      ? window.JM.insuranceParser.parse(raw)
+      : null;
+    const insurance = structured && structured.explicitClient
+      ? structured.explicitClient
+      : aiDetectInsurance(raw, lines);
+    const protocol = structured && structured.protocol ||
+      aiValue(lines, ["protocolo", "ordem de serviço", "ordem de servico", "os"]) ||
       aiMatch(raw, /\b([A-Z]{2,}\d{4,}(?:\/\d+){0,3}|A\d{8,}\/\d+)\b/i);
-    const beneficiary = aiValue(lines, ["beneficiário", "beneficiario", "nome / nome fantasia", "nome fantasia"]);
-    const requester = aiValue(lines, ["solicitante"]);
-    const billingClient = aiValue(lines, ["cliente"]) || insurance;
+    const beneficiary = structured && structured.beneficiary ||
+      aiValue(lines, ["beneficiário", "beneficiario", "nome / nome fantasia", "nome fantasia"]);
+    const requester = structured && structured.requester || aiValue(lines, ["solicitante"]);
+    const billingClient = structured && structured.explicitClient || aiValue(lines, ["cliente"]) || insurance;
     const client = beneficiary || billingClient || requester;
-    const phone = aiValue(lines, ["telefone do beneficiário", "telefone do beneficiario", "telefone"]) ||
+    const phone = structured && structured.beneficiaryPhone ||
+      aiValue(lines, ["telefone do beneficiário", "telefone do beneficiario", "telefone"]) ||
       aiMatch(raw, /(?:\+?55\s*)?\(?\d{2}\)?\s*9?\d{4}[-\s]?\d{4}/);
-    const vehicle = aiValue(lines, ["veículo", "veiculo"]);
-    const plate = plateKey(aiValue(lines, ["placa"]) || aiMatch(raw, /\b([A-Z]{3}[-\s]?[0-9][A-Z0-9][0-9]{2}|[A-Z]{3}[-\s]?[0-9]{4})\b/i));
-    const year = aiValue(lines, ["ano"]);
-    const color = aiValue(lines, ["cor do veículo", "cor do veiculo"]);
-    const cause = aiValue(lines, ["causa"]);
+    const vehicle = structured && structured.vehicle || aiValue(lines, ["veículo", "veiculo"]);
+    const plate = plateKey(structured && structured.plate || aiValue(lines, ["placa"]) || aiMatch(raw, /\b([A-Z]{3}[-\s]?[0-9][A-Z0-9][0-9]{2}|[A-Z]{3}[-\s]?[0-9]{4})\b/i));
+    const year = structured && structured.year || aiValue(lines, ["ano"]);
+    const color = structured && structured.color || aiValue(lines, ["cor do veículo", "cor do veiculo"]);
+    const cause = structured && structured.cause || aiValue(lines, ["causa"]);
     const serviceType = aiValue(lines, ["tipo de serviço", "tipo de servico", "serviço", "servico"]) || "Guincho";
-    const externalStatus = aiValue(lines, ["situação", "situacao"]) || (/finalizado/i.test(raw) ? "Finalizado" : "");
-    const origin = aiBlock(lines, ["origem"], ["destino", "tarifas", "valores", "perguntas", "questionário", "questionario"]) ||
-      aiBlock(lines, ["endereço de acionamento", "endereco de acionamento"], ["origem", "destino", "tarifas", "valores", "perguntas"]);
-    const destination = aiBlock(lines, ["destino"], ["tarifas", "valores", "perguntas", "questionário", "questionario"]);
+    const externalStatus = structured && structured.externalStatus
+      ? structured.externalStatus
+      : (aiValue(lines, ["situação", "situacao"]) || (/finalizado/i.test(raw) ? "Finalizado" : ""));
+    const technician = structured && structured.technician ? structured.technician : "";
+    const originDetails = structured && structured.origin ? structured.origin : null;
+    const destinationDetails = structured && structured.destination ? structured.destination : null;
+    const origin = originDetails && originDetails.searchAddress
+      ? originDetails.searchAddress
+      : (aiBlock(lines, ["origem"], ["destino", "tarifas", "valores", "perguntas", "questionário", "questionario"]) ||
+        aiBlock(lines, ["endereço de acionamento", "endereco de acionamento"], ["origem", "destino", "tarifas", "valores", "perguntas"]));
+    const destination = destinationDetails && destinationDetails.searchAddress
+      ? destinationDetails.searchAddress
+      : aiBlock(lines, ["destino"], ["tarifas", "valores", "perguntas", "questionário", "questionario"]);
     const observations = aiBlock(lines, ["observação", "observacao", "observações", "observacoes"], ["tipo de serviço", "tipo de servico", "endereço", "endereco", "perguntas", "valores", "tarifas"]);
     const questions = aiQuestions(lines);
-    const tariffs = aiTariffs(lines);
-    const totalRouteKm = aiMetricKm(lines, ["percurso total"], ["distância da base", "distancia da base", "viatura próxima", "viatura proxima"]);
-    const baseDistanceKm = aiMetricKm(lines, ["distância da base", "distancia da base", "viatura próxima", "viatura proxima"]);
-    const amount = aiMoneyNear(lines, ["valor total", "valor"]) || aiAmount(raw) || tariffs.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const tariffs = structured && Array.isArray(structured.tariffs) && structured.tariffs.length
+      ? structured.tariffs
+      : aiTariffs(lines);
+    const tariffTotal = structured && Number(structured.tariffTotal || 0) || tariffs.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const totalRouteKm = structured && Number(structured.totalRouteKm || 0) ||
+      aiMetricKm(lines, ["percurso total"], ["distância da base", "distancia da base", "viatura próxima", "viatura proxima"]);
+    const baseDistanceKm = structured && Number(structured.baseDistanceKm || 0) ||
+      aiMetricKm(lines, ["distância da base", "distancia da base", "viatura próxima", "viatura proxima"]);
+    const amount = structured && Number(structured.totalValue || 0) ||
+      aiMoneyNear(lines, ["valor total", "valor"]) || aiAmount(raw) || tariffTotal;
     const mapLinks = Array.from(raw.matchAll(/https?:\/\/\S+/gi)).map((m) => m[0].replace(/[),.;]+$/, ""));
     const notes = [
       requester ? "Solicitante: " + requester : "",
+      technician ? "Técnico informado pela seguradora: " + technician : "",
       billingClient && billingClient !== insurance ? "Cliente/associado/pagador: " + billingClient : "",
-      externalStatus ? "Status no portal: " + externalStatus : "",
+      externalStatus ? "Status no portal externo: " + externalStatus : "",
       cause ? "Causa: " + cause : "",
+      originDetails && originDetails.reference ? "Referência da origem: " + originDetails.reference : "",
+      originDetails && originDetails.observation ? "Observação da origem: " + originDetails.observation : "",
+      destinationDetails && destinationDetails.reference ? "Referência do destino: " + destinationDetails.reference : "",
+      destinationDetails && destinationDetails.observation ? "Observação do destino: " + destinationDetails.observation : "",
       observations ? "Observações do acionamento: " + observations : "",
       questions.length ? "Perguntas da seguradora:\n" + questions.map((q) => "- " + q.question + " " + q.answer).join("\n") : "",
       tariffs.length ? "Tarifas:\n" + tariffs.map((row) => "- " + row.raw).join("\n") : ""
@@ -4147,6 +4239,9 @@ Rota: ${url}`;
       serviceType,
       origin,
       destination,
+      originDetails,
+      destinationDetails,
+      technician,
       plate,
       vehicle,
       year,
@@ -4157,6 +4252,7 @@ Rota: ${url}`;
       baseDistanceKm,
       questions,
       tariffs,
+      tariffTotal,
       mapLinks,
       notes,
       externalStatus,
@@ -4404,11 +4500,16 @@ Rota: ${url}`;
       notes: reviewed.notes,
       questions: original.questions || [],
       tariffs: original.tariffs || [],
+      tariffTotal: Number(original.tariffTotal || 0),
       questionSummary: reviewed.questionSummary,
       tariffSummary: reviewed.tariffSummary,
       mapLinks: original.mapLinks || [],
       rawText: draft && draft.rawText || "",
-      parserVersion: "jm-v32-1-senior-hotfix-motorista-evidencias"
+      externalStatus: original.externalStatus || "",
+      technician: original.technician || "",
+      originDetails: original.originDetails || null,
+      destinationDetails: original.destinationDetails || null,
+      parserVersion: "jm-v32-3-final-consolidada"
     };
     return { original, reviewed };
   }
@@ -4431,16 +4532,21 @@ Rota: ${url}`;
       aiGenerated: true,
       aiReviewed: true,
       aiCreatedAt: now,
-      aiParserVersion: "jm-v32-1-senior-hotfix-motorista-evidencias",
+      aiParserVersion: "jm-v32-3-final-consolidada",
       cliente: reviewed.customerName || reviewed.requester || reviewed.billingClient || "Cliente não informado",
       phone: reviewed.customerPhone || "",
       serviceType: reviewed.serviceType || "Seguradora",
       valor: reviewed.amount || 0,
+      value: reviewed.amount || 0,
+      amount: reviewed.amount || 0,
       priceMode: reviewed.amount ? "manual" : "pending",
+      pricingSource: reviewed.amount ? "insurance_import" : "pending_route_validation",
       manualPriceLocked: !!reviewed.amount,
       sourceName: reviewed.insurance || "Assistente IA",
       insurance: reviewed.insurance || "",
       insuranceProtocol: reviewed.protocol || "",
+      externalStatus: original.externalStatus || "",
+      technician: original.technician || "",
       policy: reviewed.protocol || "",
       policyNumber: "",
       claimNumber: "",
@@ -4452,8 +4558,12 @@ Rota: ${url}`;
       destLabel: reviewed.destinationText || "",
       origin: null,
       destination: null,
-      origem: hasOriginText ? { label: reviewed.originText, coords: null, source: "ai_text_pending_geocode" } : null,
-      destino: hasDestinationText ? { label: reviewed.destinationText, coords: null, source: "ai_text_pending_geocode" } : null,
+      origem: hasOriginText ? { label: reviewed.originText, coords: null, source: "ai_text_pending_geocode", details: original.originDetails || null } : null,
+      destino: hasDestinationText ? { label: reviewed.destinationText, coords: null, source: "ai_text_pending_geocode", details: original.destinationDetails || null } : null,
+      originDetails: original.originDetails || null,
+      destinationDetails: original.destinationDetails || null,
+      tariffs: original.tariffs || [],
+      tariffTotal: Number(original.tariffTotal || 0),
       routeValidationStatus: routePending ? "pendente" : "sem_endereco",
       routePrecision: routePending ? "pending_ai_text_geocode" : "no_route_data",
       routeProvider: "ai_text_pending_geocode",
@@ -4472,8 +4582,8 @@ Rota: ${url}`;
         finalValue: reviewed.amount,
         priceMode: "manual",
         manualPriceLocked: true,
-        source: "ai_manual_amount",
-        warning: "Valor extraído/revisado pela IA. Não foi substituído por rota inteligente.",
+        source: "insurance_import",
+        warning: "Valor oficial importado da seguradora. A rota pode sugerir outro valor, mas não substitui este sem ação explícita do usuário.",
         calculatedAt: now
       } : null,
       notes: reviewed.notesFull || "",
@@ -4593,7 +4703,7 @@ Rota: ${url}`;
           tariffSummary: reviewed.tariffSummary,
           mapLinks: original.mapLinks || [],
           rawText: draft.rawText || "",
-          parserVersion: "jm-v32-1-senior-hotfix-motorista-evidencias"
+          parserVersion: "jm-v32-3-final-consolidada"
         },
         rawPayload: draft.rawText || "",
         payload: Object.assign({}, original, reviewed),
@@ -5287,6 +5397,7 @@ Rota: ${url}`;
     createOfficialCallFromAi,
     saveAiDraft,
     buildAiDraftsFromText: buildAiDrafts,
+    parseInsuranceText: aiBuildInsuranceCall,
     calculateSmartRoute,
     readSharedRouteLink,
     calculateRoutePricing,

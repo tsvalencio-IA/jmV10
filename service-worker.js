@@ -1,4 +1,4 @@
-const CACHE_NAME = "jm-v32-1-senior-hotfix-motorista-evidencias";
+const CACHE_NAME = "jm-v32-3-final-consolidada";
 const ASSETS = [
   "./",
   "./index.html",
@@ -15,6 +15,7 @@ const ASSETS = [
   "./js/firebase.js",
   "./js/tracker.js",
   "./js/google-maps.js",
+  "./js/insurance-parser.js",
   "./js/mapa.js",
   "./js/toll-plazas.js",
   "./js/app.js",

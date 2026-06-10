@@ -1,0 +1,30 @@
+Base: jmV10-main(1).zip
+
+Arquivos de aplicação alterados:
+- index.html
+- jm.html
+- motorista.html
+- superadmin.html
+- cliente-chamado.html
+- relatorio.html
+- service-worker.js
+- js/app.js
+- js/google-maps.js
+- js/motorista.js
+
+Arquivo novo:
+- js/insurance-parser.js
+
+Testes/documentação:
+- DEVTOOLS_TEST_JM_GUINCHOS.js
+- DEVTOOLS_TEST_MOTORISTA_V32_3.js
+- ENTREGA_V32_3_FINAL_CONSOLIDADA.md
+- LISTA_ARQUIVOS_ALTERADOS_V32_3.txt
+- tests/insurance-parser.test.js
+- tests/geocode-brasil.test.js
+- tests/version-cache.test.js
+- tests/run-all.js
+
+Regras preservadas sem alteração:
+- firestore.rules
+- database.rules.json

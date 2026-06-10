@@ -132,16 +132,107 @@
     return cleanText(settings && (settings.searchSuffix || settings.defaultSearchSuffix || settings.city || settings.defaultCity));
   }
 
+  const BRAZIL_UFS = new Set(["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"]);
+  const BRAZIL_STATE_NAMES = {
+    acre:"AC", alagoas:"AL", amapa:"AP", amazonas:"AM", bahia:"BA", ceara:"CE",
+    "distrito federal":"DF", "espirito santo":"ES", goias:"GO", maranhao:"MA",
+    "mato grosso":"MT", "mato grosso do sul":"MS", "minas gerais":"MG", para:"PA",
+    paraiba:"PB", parana:"PR", pernambuco:"PE", piaui:"PI", "rio de janeiro":"RJ",
+    "rio grande do norte":"RN", "rio grande do sul":"RS", rondonia:"RO", roraima:"RR",
+    "santa catarina":"SC", "sao paulo":"SP", sergipe:"SE", tocantins:"TO"
+  };
+
+  function geoKey(value) {
+    return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+
+  function expectedState(text) {
+    const raw = String(text || "");
+    const matches = raw.toUpperCase().match(/(?:^|[\s,\-/])([A-Z]{2})(?=$|[\s,\-/])/g) || [];
+    for (const token of matches) {
+      const uf = token.replace(/[^A-Z]/g, "");
+      if (BRAZIL_UFS.has(uf)) return uf;
+    }
+    const normalized = geoKey(raw);
+    for (const name of Object.keys(BRAZIL_STATE_NAMES).sort(function (a, b) { return b.length - a.length; })) {
+      const pattern = new RegExp("(?:^|\\s)" + name.replace(/\s+/g, "\\s+") + "(?:$|\\s)");
+      if (pattern.test(normalized)) return BRAZIL_STATE_NAMES[name];
+    }
+    return "";
+  }
+
+  function normalizeUf(value) {
+    const raw = String(value || "").toUpperCase().trim();
+    const match = raw.match(/(?:^|[-_/])([A-Z]{2})$/);
+    const uf = match ? match[1] : raw;
+    return BRAZIL_UFS.has(uf) ? uf : expectedState(raw);
+  }
+
+  function expectedCity(text, state) {
+    const raw = cleanText(text);
+    const dash = raw.match(/(?:^|,|\s)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{2,}?)\s*[-/]\s*([A-Z]{2})\b/i);
+    if (dash && BRAZIL_UFS.has(String(dash[2]).toUpperCase())) return cleanText(dash[1]);
+    const parts = raw.split(",").map(cleanText).filter(Boolean);
+    for (let i = parts.length - 1; i >= 0; i -= 1) {
+      const part = parts[i];
+      if (/^(brasil|brazil)$/i.test(part)) continue;
+      if (/^\d{5}-?\d{3}$/.test(part)) continue;
+      if (BRAZIL_UFS.has(part.toUpperCase())) continue;
+      if (BRAZIL_STATE_NAMES[geoKey(part)]) continue;
+      if (/\b(?:rua|avenida|av\.?|rodovia|estrada|travessa|alameda|km)\b/i.test(part)) continue;
+      if (/^(distrito|bairro|centro|zona|jardim|jd\.?|vila|parque|loteamento|industrial)$/i.test(part)) continue;
+      if (/^\d+$/.test(part)) continue;
+      if (state && part.toUpperCase() === state) continue;
+      return part;
+    }
+    return "";
+  }
+
+  function expectedGeoContext(text) {
+    const state = expectedState(text);
+    return { state, city: expectedCity(text, state), raw: cleanText(text) };
+  }
+
+  function isBrazilPoint(point) {
+    const p = toLatLng(point);
+    return !!p && p.lat >= -34.5 && p.lat <= 6.0 && p.lng >= -74.5 && p.lng <= -32.0;
+  }
+
   function looksLikeFullAddress(text) {
-    const raw = cleanText(text).toLowerCase();
-    return /\b(sp|rj|mg|pr|sc|rs|go|mt|ms|ba|pe|ce|brasil|brazil)\b/.test(raw) || raw.includes("sao jose") || raw.includes("são jose");
+    const raw = geoKey(text);
+    const hasUf = Array.from(BRAZIL_UFS).some((uf) => new RegExp("(?:^|\\s)" + uf.toLowerCase() + "(?:$|\\s)").test(raw));
+    const hasStateName = Object.keys(BRAZIL_STATE_NAMES).some((name) => raw.includes(name));
+    return hasUf || hasStateName || /\b(brasil|brazil)\b/.test(raw) || /\b\d{5}[- ]?\d{3}\b/.test(raw);
+  }
+
+  function uniqueQueries(values) {
+    const seen = new Set();
+    return values.map(cleanText).filter(Boolean).filter((value) => {
+      const normalized = geoKey(value);
+      if (!normalized || seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    });
   }
 
   function searchQueries(text, settings) {
     const raw = cleanText(text);
+    if (!raw) return [];
     const suffix = searchSuffix(settings);
-    if (!raw || !suffix || looksLikeFullAddress(raw)) return [raw];
-    return [raw + ", " + suffix, raw];
+    const context = expectedGeoContext(raw);
+    const withBrazil = /\bbrasil\b/i.test(raw) ? raw : raw + ", Brasil";
+    const parts = raw.split(",").map(cleanText).filter(Boolean);
+    const street = parts[0] || raw;
+    const numberPart = parts.find((part) => /\b\d{1,6}\b/.test(part)) || "";
+    const cityState = [context.city, context.state, "Brasil"].filter(Boolean).join(", ");
+    const progressive = [
+      withBrazil,
+      [street, numberPart !== street ? numberPart : "", cityState].filter(Boolean).join(", "),
+      [street, cityState].filter(Boolean).join(", "),
+      cityState
+    ];
+    if (suffix && !looksLikeFullAddress(raw)) progressive.unshift(raw + ", " + suffix + ", Brasil");
+    return uniqueQueries(progressive);
   }
 
   function biasBox(settings) {
@@ -187,12 +278,69 @@
     return googleMapsPromise;
   }
 
-  function geocodeWithGoogle(text, settings) {
+  function googleComponent(result, type, shortName) {
+    const components = result && result.address_components || [];
+    const component = components.find((item) => Array.isArray(item.types) && item.types.includes(type));
+    return component ? String(shortName ? component.short_name : component.long_name || "") : "";
+  }
+
+  function candidateMatchesExpected(found, expected) {
+    if (!found) return false;
+    if (String(found.country || "").toUpperCase() !== "BR") return false;
+    if (!isBrazilPoint(found.coords)) return false;
+    if (expected.state && String(found.state || "").toUpperCase() !== expected.state) return false;
+    if (expected.city) {
+      const expectedKey = geoKey(expected.city);
+      const cityKey = geoKey(found.city || "");
+      const labelKey = geoKey(found.label || "");
+      if (cityKey !== expectedKey && !cityKey.includes(expectedKey) && !expectedKey.includes(cityKey) && !labelKey.includes(expectedKey)) return false;
+    }
+    return true;
+  }
+
+  function candidateScore(found, expected, settings) {
+    let score = Number(found.importance || 0);
+    if (found.country === "BR") score += 20;
+    if (isBrazilPoint(found.coords)) score += 10;
+    if (expected.state && found.state === expected.state) score += 12;
+    if (expected.city) {
+      const expectedKey = geoKey(expected.city);
+      const cityKey = geoKey(found.city || "");
+      const labelKey = geoKey(found.label || "");
+      if (cityKey === expectedKey) score += 18;
+      else if (cityKey.includes(expectedKey) || expectedKey.includes(cityKey)) score += 12;
+      else if (labelKey.includes(expectedKey)) score += 8;
+    }
+    const box = biasBox(settings);
+    if (box && found.coords) {
+      const km = haversineKm(found.coords, box.center);
+      score += Math.max(0, 2 - (km / 800));
+    }
+    return score;
+  }
+
+  function dedupeCandidates(candidates) {
+    const seen = new Set();
+    return (candidates || []).filter(function (candidate) {
+      if (!candidate || !candidate.coords) return false;
+      const normalized = geoKey(candidate.label) + "|" + Number(candidate.coords.lat).toFixed(5) + "|" + Number(candidate.coords.lng).toFixed(5);
+      if (seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    });
+  }
+
+  function googleCandidateList(text, settings) {
     return loadGoogleMaps(settings).then((ok) => new Promise((resolve, reject) => {
       if (!ok || !window.google || !google.maps.Geocoder) return reject(new Error("Google Maps não está configurado."));
       const geocoder = new google.maps.Geocoder();
       const box = biasBox(settings);
-      const request = { address: text, region: settings && settings.region || "BR" };
+      const expected = expectedGeoContext(text);
+      const request = {
+        address: text,
+        region: "br",
+        componentRestrictions: { country: "BR" }
+      };
       if (box && google.maps.LatLngBounds) {
         request.bounds = new google.maps.LatLngBounds(
           new google.maps.LatLng(box.south, box.west),
@@ -200,72 +348,138 @@
         );
       }
       geocoder.geocode(request, (results, status) => {
-        if (status === "OK" && results && results[0] && results[0].geometry && results[0].geometry.location) {
-          const loc = results[0].geometry.location;
-          return resolve({
-            label: results[0].formatted_address || text,
-            coords: { lat: loc.lat(), lng: loc.lng() },
-            source: "google_geocoding",
+        if (status !== "OK" || !Array.isArray(results) || !results.length) {
+          return reject(new Error("O Google Maps não localizou esse endereço no Brasil. Confira cidade, UF, CEP ou use coordenadas."));
+        }
+        const candidates = results.map((result) => {
+          const loc = result.geometry && result.geometry.location;
+          const coordsValue = loc ? { lat: loc.lat(), lng: loc.lng() } : null;
+          const country = googleComponent(result, "country", true).toUpperCase();
+          const state = googleComponent(result, "administrative_area_level_1", true).toUpperCase();
+          const city = googleComponent(result, "locality", false) || googleComponent(result, "administrative_area_level_2", false) || googleComponent(result, "sublocality", false);
+          const found = {
+            label: result.formatted_address || text,
+            coords: coordsValue,
+            country,
+            countryCode: country.toLowerCase(),
+            state,
+            city,
+            placeId: result.place_id || "",
+            source: "google_geocoding_br_validated",
             provider: "google_maps",
             raw: text,
-            externalUrl: googlePlaceUrl(results[0].formatted_address || text),
-            placeId: results[0].place_id || "",
+            externalUrl: googlePlaceUrl(result.formatted_address || text),
             resolvedAt: new Date().toISOString()
-          });
+          };
+          found.confidence = Math.max(0, Math.min(1, candidateScore(found, expected, settings) / 65));
+          return found;
+        }).filter((candidate) => candidateMatchesExpected(candidate, expected));
+
+        const ranked = dedupeCandidates(candidates).sort((a, b) => candidateScore(b, expected, settings) - candidateScore(a, expected, settings));
+        if (!ranked.length) {
+          return reject(new Error("O endereço retornado não corresponde ao Brasil, cidade ou UF informada. Revise o destino antes de calcular a rota."));
         }
-        reject(new Error("O Google Maps não localizou este endereço. Confira bairro, cidade e número."));
+        resolve(ranked.slice(0, 8));
       });
     }));
   }
 
-  function chooseBestNominatim(rows, settings) {
-    const list = Array.isArray(rows) ? rows.filter(Boolean) : [];
-    if (!list.length) return null;
+  async function geocodeWithGoogle(text, settings) {
+    const candidates = await googleCandidateList(text, settings);
+    const hit = candidates[0];
+    return Object.assign({}, hit, {
+      alternatives: candidates.slice(1, 5).map(function (candidate) {
+        return { label: candidate.label, coords: candidate.coords, city: candidate.city, state: candidate.state, countryCode: candidate.countryCode };
+      })
+    });
+  }
+
+  function nominatimContext(row) {
+    const address = row && row.address || {};
+    return {
+      label: row.display_name || "",
+      coords: coords(row.lat, row.lon),
+      country: String(address.country_code || "").toUpperCase(),
+      state: normalizeUf(address.state_code || address.state || ""),
+      city: address.city || address.town || address.village || address.municipality || address.county || "",
+      importance: Number(row.importance || 0),
+      rawRow: row
+    };
+  }
+
+  function rankedNominatimCandidates(rows, settings, text) {
+    const expected = expectedGeoContext(text);
+    const list = (Array.isArray(rows) ? rows : [])
+      .map(nominatimContext)
+      .filter((candidate) => candidateMatchesExpected(candidate, expected))
+      .map(function (candidate) {
+        const score = candidateScore(candidate, expected, settings);
+        return Object.assign({}, candidate, {
+          source: "nominatim_openstreetmap_br_validated",
+          provider: "openstreetmap",
+          raw: text,
+          externalUrl: googlePlaceUrl(candidate.label || text),
+          countryCode: String(candidate.country || "").toLowerCase(),
+          confidence: Math.max(0, Math.min(1, score / 65)),
+          resolvedAt: new Date().toISOString(),
+          _score: score
+        });
+      });
+    return dedupeCandidates(list).sort((a, b) => b._score - a._score);
+  }
+
+  async function nominatimCandidateList(text, settings) {
+    const queries = searchQueries(text, settings);
     const box = biasBox(settings);
-    return list.map((row) => {
-      const point = coords(row.lat, row.lon);
-      let score = Number(row.importance || 0);
-      if (row.type === "house" || row.addresstype === "building") score += 0.35;
-      if (row.class === "highway" || row.type === "street") score += 0.12;
-      if (box && point) {
-        const km = haversineKm(point, box.center);
-        score += Math.max(0, 0.35 - (km / 240));
-      }
-      return { row, score };
-    }).sort((a, b) => b.score - a.score)[0].row;
+    let allRows = [];
+    for (const query of queries) {
+      const url = new URL("https://nominatim.openstreetmap.org/search");
+      url.searchParams.set("format", "jsonv2");
+      url.searchParams.set("limit", "10");
+      url.searchParams.set("addressdetails", "1");
+      url.searchParams.set("q", query);
+      url.searchParams.set("countrycodes", "br");
+      url.searchParams.set("accept-language", "pt-BR,pt");
+      if (box) url.searchParams.set("viewbox", [box.west, box.north, box.east, box.south].join(","));
+      const response = await fetch(url.toString(), {
+        headers: { "Accept": "application/json", "Accept-Language": "pt-BR,pt" },
+        cache: "no-store"
+      });
+      if (!response.ok) throw new Error("Busca gratuita de endereço indisponível agora. Cole um link do Maps ou coordenadas.");
+      const rows = await response.json();
+      allRows = allRows.concat(Array.isArray(rows) ? rows : []);
+      const ranked = rankedNominatimCandidates(allRows, settings, text);
+      if (ranked.length >= 3) return ranked.slice(0, 8);
+    }
+    const ranked = rankedNominatimCandidates(allRows, settings, text);
+    if (!ranked.length) throw new Error("Não encontrei um endereço compatível no Brasil. Informe cidade/UF, CEP, coordenadas ou cole um link compartilhado do mapa.");
+    return ranked.slice(0, 8);
   }
 
   async function geocodeWithNominatim(text, settings) {
-    const queries = searchQueries(text, settings);
-    const box = biasBox(settings);
-    let rows = [];
-    let response = null;
-    for (const query of queries) {
-    const url = new URL("https://nominatim.openstreetmap.org/search");
-    url.searchParams.set("format", "jsonv2");
-    url.searchParams.set("limit", "5");
-    url.searchParams.set("addressdetails", "1");
-    url.searchParams.set("q", query);
-    url.searchParams.set("countrycodes", String(settings && settings.country || "br").toLowerCase());
-    if (box) url.searchParams.set("viewbox", [box.west, box.north, box.east, box.south].join(","));
-    response = await fetch(url.toString(), { headers: { "Accept": "application/json" }, cache: "no-store" });
-    if (!response.ok) throw new Error("Busca gratuita de endereço indisponível agora. Cole um link do Maps ou coordenadas.");
-    rows = await response.json();
-    if (rows && rows.length) break;
+    const candidates = await nominatimCandidateList(text, settings);
+    return Object.assign({}, candidates[0], {
+      alternatives: candidates.slice(1, 5).map(function (candidate) {
+        return { label: candidate.label, coords: candidate.coords, city: candidate.city, state: candidate.state, countryCode: candidate.countryCode };
+      })
+    });
+  }
+
+  async function geocodeCandidates(text, settings) {
+    const parsed = parseLocationInput(text);
+    if (parsed && parsed.coords) {
+      if (!isBrazilPoint(parsed.coords)) throw new Error("As coordenadas informadas estão fora dos limites do Brasil.");
+      return [Object.assign({}, parsed, { country: "BR", countryCode: "br", confidence: 1 })];
     }
-    const hit = chooseBestNominatim(rows, settings);
-    if (!hit) throw new Error("Não encontrei esse endereço na busca gratuita. Digite cidade/UF ou cole o link do Google Maps.");
-    const point = coords(hit.lat, hit.lon);
-    if (!point) throw new Error("O endereço foi encontrado, mas veio sem coordenadas utilizáveis.");
-    return {
-      label: hit.display_name || text,
-      coords: point,
-      source: "nominatim_openstreetmap",
-      provider: "openstreetmap",
-      raw: text,
-      externalUrl: googlePlaceUrl(hit.display_name || text),
-      resolvedAt: new Date().toISOString()
-    };
+    if (!parsed || !parsed.raw) throw new Error("Informe endereço, link do mapa ou coordenadas.");
+    if (isGoogleConfigured(settings || {})) {
+      try {
+        return await googleCandidateList(parsed.raw, settings || {});
+      } catch (error) {
+        console.warn("Google não retornou candidato brasileiro válido; tentando OpenStreetMap:", error);
+      }
+    }
+    return nominatimCandidateList(parsed.raw, settings || {});
   }
 
   async function initAutocomplete(inputId, onSelect, settings) {
@@ -280,7 +494,7 @@
           const box = biasBox(settings || {});
           const options = {
             componentRestrictions: { country },
-            fields: ["formatted_address", "geometry", "name", "place_id"],
+            fields: ["formatted_address", "geometry", "name", "place_id", "address_components"],
             strictBounds: false
           };
           if (box && google.maps.LatLngBounds) {
@@ -292,18 +506,35 @@
           const autocomplete = new google.maps.places.Autocomplete(input, options);
           autocomplete.addListener("place_changed", () => {
             const place = autocomplete.getPlace();
-            if (place && place.geometry && place.geometry.location && typeof onSelect === "function") {
-              onSelect({
-                label: place.formatted_address || place.name || input.value,
-                coords: { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() },
-                source: "google_places_autocomplete",
-                provider: "google_maps",
-                raw: input.value,
-                externalUrl: googlePlaceUrl(place.formatted_address || input.value),
-                placeId: place.place_id || "",
-                resolvedAt: new Date().toISOString()
-              });
+            if (!place || !place.geometry || !place.geometry.location || typeof onSelect !== "function") return;
+            const coordsValue = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() };
+            const country = googleComponent(place, "country", true).toUpperCase();
+            const state = googleComponent(place, "administrative_area_level_1", true).toUpperCase();
+            const city = googleComponent(place, "locality", false) || googleComponent(place, "administrative_area_level_2", false) || googleComponent(place, "sublocality", false);
+            const expected = expectedGeoContext(input.value);
+            const found = {
+              label: place.formatted_address || place.name || input.value,
+              coords: coordsValue,
+              country,
+              countryCode: country.toLowerCase(),
+              state,
+              city
+            };
+            if (!candidateMatchesExpected(found, expected)) {
+              input.setCustomValidity("Selecione um endereço válido no Brasil e compatível com a cidade/UF informada.");
+              input.reportValidity();
+              return;
             }
+            input.setCustomValidity("");
+            onSelect(Object.assign({}, found, {
+              source: "google_places_autocomplete_br_validated",
+              provider: "google_maps",
+              raw: input.value,
+              externalUrl: googlePlaceUrl(place.formatted_address || input.value),
+              placeId: place.place_id || "",
+              confidence: 1,
+              resolvedAt: new Date().toISOString()
+            }));
           });
         }
       } catch (err) {
@@ -318,13 +549,8 @@
   }
 
   async function geocode(text, settings) {
-    const parsed = parseLocationInput(text);
-    if (parsed && parsed.coords) return parsed;
-    if (!parsed || !parsed.raw) throw new Error("Informe endereço, link do mapa ou coordenadas.");
-    if (isGoogleConfigured(settings || {})) {
-      try { return await geocodeWithGoogle(parsed.raw, settings || {}); } catch (err) { console.warn(err); }
-    }
-    return geocodeWithNominatim(parsed.raw, settings || {});
+    const candidates = await geocodeCandidates(text, settings || {});
+    return candidates[0];
   }
 
   function estimateRoute(a, b, label) {
@@ -496,9 +722,12 @@
     loadGoogleMaps,
     initAutocomplete,
     geocode,
+    geocodeCandidates,
     geocodeWithGoogle,
     geocodeWithNominatim,
     googlePlaceUrl,
+    expectedGeoContext,
+    isBrazilPoint,
     estimateRoute,
     routeThroughPoints,
     osrmRoute,

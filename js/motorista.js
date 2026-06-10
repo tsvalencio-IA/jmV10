@@ -4,7 +4,7 @@
   const { $, esc, parseMoney, toast, statusClass, routeKm, mapsRouteUrl, statusKey, statusLabel, isFinalStatus, setupCollapsiblePanels, pointFrom } = window.JM.utils;
   const { auth, db, arrayUnion, getRealtimeDb, rtdbKey } = window.JM.firebase;
   const cfg = window.JM_CONFIG || {};
-  const DRIVER_FLOW_VERSION = "jm-v32-1-senior-hotfix-motorista-evidencias";
+  const DRIVER_FLOW_VERSION = "jm-v32-3-final-consolidada";
   const state = { user: null, profile: null, calls: {}, vehicles: {}, expenses: {}, settings: {}, selectedCallId: "", driverLivePoint: null };
   const unsubscribers = [];
   let driverLocationWatchId = null;
