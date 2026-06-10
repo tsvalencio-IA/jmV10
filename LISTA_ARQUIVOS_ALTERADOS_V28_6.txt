@@ -1,0 +1,14 @@
+LISTA DE ARQUIVOS ALTERADOS — V28.6
+
+index.html
+jm.html
+motorista.html
+cliente-chamado.html
+relatorio.html
+superadmin.html
+service-worker.js
+js/app.js
+js/motorista.js
+js/utils.js
+ENTREGA_V28_6_AI_CHAMADO_OFICIAL.md
+LISTA_ARQUIVOS_ALTERADOS_V28_6.txt

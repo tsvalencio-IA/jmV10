@@ -1,0 +1,19 @@
+Arquivos alterados na entrega JM-ATT V32:
+
+1. index.html
+2. jm.html
+3. motorista.html
+4. cliente-chamado.html
+5. relatorio.html
+6. superadmin.html
+7. service-worker.js
+8. css/style.css
+9. js/app.js
+10. js/motorista.js
+11. firestore.rules
+12. ENTREGA_V32_OPERACIONAL_SEGURADORAS_EVIDENCIAS.md
+13. LISTA_ARQUIVOS_ALTERADOS_V32.txt
+
+Observação:
+- database.rules.json não foi alterado nesta entrega.
+- js/mapa.js, js/tracker.js, js/google-maps.js, js/firebase.js, js/utils.js, js/superadmin.js e js/toll-plazas.js foram validados por sintaxe, mas não precisaram ser alterados.
