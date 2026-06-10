@@ -237,7 +237,9 @@ service cloud.firestore {
     }
 
     match /settings/{id} {
-      allow read: if isOffice() || isManager() || (signedIn() && id in ['public', 'publicIntegrations']);
+      // V32.1: motorista precisa ler integrações mínimas para Cloudinary/GPS celular.
+      // Preferência futura: espelhar somente dados públicos em settings/publicIntegrations.
+      allow read: if isOffice() || isManager() || (isDriver() && id in ['integrations', 'public', 'publicIntegrations']) || (signedIn() && id in ['public', 'publicIntegrations']);
       allow write: if isOwner();
     }
   }

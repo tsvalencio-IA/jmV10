@@ -1,4 +1,4 @@
-const CACHE_NAME = "jm-v32-operacional-seguradoras-evidencias";
+const CACHE_NAME = "jm-v32-1-senior-hotfix-motorista-evidencias";
 const ASSETS = [
   "./",
   "./index.html",

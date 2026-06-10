@@ -10,7 +10,7 @@
   const { auth, secondaryAuth, db, ts, arrayUnion, emailIsAdmin, getRealtimeDb, rtdbKey } = window.JM.firebase;
   const cfg = window.JM_CONFIG || {};
   const SYSTEM_SIGNATURE = "";
-  const LOGIN_FLOW_VERSION = "jm-v32-operacional-seguradoras-evidencias";
+  const LOGIN_FLOW_VERSION = "jm-v32-1-senior-hotfix-motorista-evidencias";
   let trackerTimer = null;
   let trackerBusy = false;
   let mapRefreshTimer = null;
@@ -4408,7 +4408,7 @@ Rota: ${url}`;
       tariffSummary: reviewed.tariffSummary,
       mapLinks: original.mapLinks || [],
       rawText: draft && draft.rawText || "",
-      parserVersion: "jm-v32-operacional-seguradoras-evidencias"
+      parserVersion: "jm-v32-1-senior-hotfix-motorista-evidencias"
     };
     return { original, reviewed };
   }
@@ -4431,7 +4431,7 @@ Rota: ${url}`;
       aiGenerated: true,
       aiReviewed: true,
       aiCreatedAt: now,
-      aiParserVersion: "jm-v32-operacional-seguradoras-evidencias",
+      aiParserVersion: "jm-v32-1-senior-hotfix-motorista-evidencias",
       cliente: reviewed.customerName || reviewed.requester || reviewed.billingClient || "Cliente não informado",
       phone: reviewed.customerPhone || "",
       serviceType: reviewed.serviceType || "Seguradora",
@@ -4593,7 +4593,7 @@ Rota: ${url}`;
           tariffSummary: reviewed.tariffSummary,
           mapLinks: original.mapLinks || [],
           rawText: draft.rawText || "",
-          parserVersion: "jm-v32-operacional-seguradoras-evidencias"
+          parserVersion: "jm-v32-1-senior-hotfix-motorista-evidencias"
         },
         rawPayload: draft.rawText || "",
         payload: Object.assign({}, original, reviewed),

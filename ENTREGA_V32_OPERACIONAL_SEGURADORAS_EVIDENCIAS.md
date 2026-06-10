@@ -12,7 +12,7 @@ Entrega consolidada em cima da base V28.6, preservando login, motorista, finance
 ### 2. Cache/versionamento unificado
 Versão única aplicada:
 
-`jm-v32-operacional-seguradoras-evidencias`
+`jm-v32-1-senior-hotfix-motorista-evidencias`
 
 Arquivos HTML, scripts e `service-worker.js` foram versionados para evitar mistura de JS antigo no celular/PWA.
 
@@ -82,7 +82,7 @@ Todos passaram sem erro de sintaxe.
 
 ## Teste funcional recomendado após subir
 
-1. Limpar cache/PWA ou abrir com query `?v=jm-v32-operacional-seguradoras-evidencias`.
+1. Limpar cache/PWA ou abrir com query `?v=jm-v32-1-senior-hotfix-motorista-evidencias`.
 2. Criar chamado oficial pelo Assistente IA.
 3. Conferir que o chamado aparece em Chamados e Central.
 4. Vincular motorista ao chamado.

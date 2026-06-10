@@ -1,0 +1,11 @@
+js/motorista.js
+firestore.rules
+index.html
+jm.html
+motorista.html
+cliente-chamado.html
+relatorio.html
+superadmin.html
+service-worker.js
+ENTREGA_V32_1_SENIOR_HOTFIX_MOTORISTA_EVIDENCIAS.md
+LISTA_ARQUIVOS_ALTERADOS_V32_1.txt
