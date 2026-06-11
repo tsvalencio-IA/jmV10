@@ -1,0 +1,24 @@
+JM Guinchos - Entrega Gabriela
+
+Base do sistema:
+- jm-v32-3-final-consolidada
+
+Arquivos principais para abrir:
+- jm.html: painel de gestao/logistica
+- motorista.html: painel do motorista
+- superadmin.html: cadastro e administracao de usuarios/perfis
+- TUTORIAL_GABRIELA.html: tutorial simples para Gabriela operar a logistica
+
+O tutorial usa imagens reais capturadas da interface desta versao:
+- tutorial-assets/renders/01-login-gestao.png
+- tutorial-assets/renders/02-central-operacional.png
+- tutorial-assets/renders/03-novo-chamado-rota.png
+- tutorial-assets/renders/04-assistente-ia.png
+- tutorial-assets/renders/05-mapa-tracker.png
+- tutorial-assets/renders/06-financeiro.png
+- tutorial-assets/renders/07-evidencias-motorista.png
+
+Observacoes importantes:
+- Para producao, publique tambem firestore.rules e database.rules.json no Firebase.
+- O erro 401 do GitHub Pages e de permissao/autenticacao do workflow/repo, nao do HTML do sistema.
+- Teste autenticado real depende das credenciais Firebase, Cloudinary e Tracker configuradas no ambiente publicado.

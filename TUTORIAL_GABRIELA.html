@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tutorial Gabriela - JM Guinchos</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17211f;
+      --muted: #5d6d68;
+      --line: #dbe7e2;
+      --soft: #f4faf7;
+      --brand: #03664f;
+      --brand-2: #0786b8;
+      --warn: #9d5b00;
+      --danger: #9a1e1e;
+      --ok: #117243;
+      --paper: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: #eef5f2;
+      line-height: 1.5;
+    }
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 48px;
+    }
+    header {
+      background: #071815;
+      color: #eef8f3;
+      border-bottom: 5px solid #0ac28b;
+    }
+    .hero {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 34px 0 28px;
+    }
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 42px);
+      letter-spacing: 0;
+    }
+    .hero p {
+      max-width: 820px;
+      margin: 0;
+      color: #bdeee0;
+      font-size: 17px;
+    }
+    .notice {
+      margin-top: 18px;
+      padding: 12px 14px;
+      border: 1px solid rgba(10, 194, 139, .42);
+      background: rgba(10, 194, 139, .12);
+      border-radius: 8px;
+      color: #e9fff7;
+    }
+    section {
+      margin-top: 22px;
+      padding: 22px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+    p { margin: 0 0 12px; }
+    ul, ol { margin: 8px 0 0 22px; padding: 0; }
+    li { margin: 7px 0; }
+    a { color: var(--brand-2); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .task {
+      padding: 16px;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      border-radius: 8px;
+    }
+    .task strong { display: block; margin-bottom: 6px; }
+    .badge {
+      display: inline-block;
+      margin: 2px 6px 2px 0;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #e2f3ee;
+      color: #064b3b;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .flow {
+      counter-reset: step;
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .flow div {
+      position: relative;
+      padding: 14px 14px 14px 54px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfefd;
+    }
+    .flow div:before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+    }
+    figure {
+      margin: 18px 0 0;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #071815;
+    }
+    figcaption {
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 14px;
+      border-top: 1px solid var(--line);
+      background: #fbfefd;
+    }
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .checklist div {
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--soft);
+    }
+    .yes { color: var(--ok); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .danger { color: var(--danger); font-weight: 700; }
+    .small { color: var(--muted); font-size: 14px; }
+    .print-note {
+      margin-top: 18px;
+      padding: 12px;
+      border-left: 4px solid var(--brand);
+      background: #edf8f4;
+    }
+    @media (max-width: 860px) {
+      .grid, .checklist { grid-template-columns: 1fr; }
+      section { padding: 18px; }
+    }
+    @media print {
+      body { background: #fff; }
+      header { color: #000; background: #fff; border-bottom: 2px solid #000; }
+      .hero p, .notice { color: #000; }
+      section { break-inside: avoid; }
+      figure { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="hero">
+      <h1>Tutorial simples para Gabriela gerir a logística</h1>
+      <p>Guia de operação diária do JM Guinchos: receber chamado, conferir rota, acionar motorista, acompanhar execução, cobrar evidências e fechar o financeiro.</p>
+      <div class="notice">As imagens deste tutorial são renders reais capturados da interface da versão <b>jm-v32-3-final-consolidada</b>. Elas servem para reconhecimento visual das telas.</div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Resumo da função da Gabriela</h2>
+      <div class="grid">
+        <div class="task">
+          <strong>1. Controlar a fila</strong>
+          Ver quais chamados entraram, qual é a prioridade, quem é a seguradora ou cliente e qual motorista vai atender.
+        </div>
+        <div class="task">
+          <strong>2. Conferir rota e preço</strong>
+          Validar origem, destino, quilometragem, pedágio, valor do guincho e SLA antes de despachar.
+        </div>
+        <div class="task">
+          <strong>3. Despachar e acompanhar</strong>
+          Enviar o chamado ao motorista correto e acompanhar mapa, rota, status e evidências.
+        </div>
+        <div class="task">
+          <strong>4. Fechar sem perder prova</strong>
+          Só finalizar quando tiver checklist, fotos, assinatura ou justificativa, despesas e valor correto.
+        </div>
+      </div>
+      <p class="print-note"><b>Regra principal:</b> chamado sem dados mínimos não deve ser despachado; chamado sem evidências não deve ser finalizado.</p>
+    </section>
+
+    <section>
+      <h2>Rotina diária recomendada</h2>
+      <div class="flow">
+        <div><b>Entrar no sistema.</b> Acesse o painel de gestão com e-mail e senha da conta autorizada.</div>
+        <div><b>Abrir Central Operacional.</b> Veja chamados ativos, prioridades, frota online e mapa de despacho.</div>
+        <div><b>Cadastrar ou importar chamado.</b> Use Novo chamado para atendimento manual ou Assistente IA quando vier texto de seguradora.</div>
+        <div><b>Validar origem, destino e preço.</b> Confira se a rota faz sentido, se o valor não foi sobrescrito e se pedágio/SLA estão corretos.</div>
+        <div><b>Escolher veículo e motorista.</b> O motorista só enxerga o chamado se o chamado ficar com o motorista correto.</div>
+        <div><b>Acompanhar execução.</b> Use mapa, status, contato com motorista e fila de chamados.</div>
+        <div><b>Cobrar evidências.</b> Motorista deve enviar fotos, avarias, assinatura, áudios e despesas quando existir.</div>
+        <div><b>Finalizar e faturar.</b> Conferiu evidência e valor? Finalize e encaminhe para financeiro/faturamento.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>1. Entrada no sistema</h2>
+      <p>Use a tela de gestão para acessar o painel administrativo. Se cair no painel do motorista, a conta está com perfil errado ou cache antigo; peça ajuste do usuário antes de operar.</p>
+      <span class="badge">Gestão</span><span class="badge">Logística</span><span class="badge">Admin</span>
+      <figure>
+        <img src="tutorial-assets/renders/01-login-gestao.png" alt="Tela real de entrada da gestão JM Guinchos">
+        <figcaption>Tela de entrada da gestão. Gabriela deve usar a conta de gestora/logística, não conta de motorista.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>2. Central Operacional</h2>
+      <p>Esta é a tela para trabalhar durante o plantão. Ela concentra filtros, mapa de despacho, fila de chamados e frota online.</p>
+      <div class="checklist">
+        <div><b>Conferir fila</b><br>Veja os chamados ativos e priorize urgências.</div>
+        <div><b>Conferir frota</b><br>Verifique se há veículo/motorista disponível.</div>
+        <div><b>Despachar</b><br>Selecione chamado e veículo antes de enviar a rota.</div>
+      </div>
+      <figure>
+        <img src="tutorial-assets/renders/02-central-operacional.png" alt="Render real da Central Operacional">
+        <figcaption>Central operacional: use esta tela para decidir quem atende e acompanhar a operação.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>3. Novo chamado e rota</h2>
+      <p>Use quando o atendimento entrar por telefone, WhatsApp ou pedido manual. Preencha com calma: cliente, WhatsApp, seguradora, protocolo, placa, veículo, motorista, origem e destino.</p>
+      <h3>Campos que não podem ficar errados</h3>
+      <ul>
+        <li><b>Origem/local do veículo:</b> onde o motorista vai buscar.</li>
+        <li><b>Destino:</b> pátio, oficina, residência ou base indicada.</li>
+        <li><b>Veículo da frota e motorista:</b> se isso estiver errado, o motorista certo não vê o chamado.</li>
+        <li><b>Valor previsto:</b> não aceite alteração automática sem revisar.</li>
+        <li><b>SLA/prioridade:</b> define a urgência do atendimento.</li>
+      </ul>
+      <p class="warn">Antes de registrar, confira se a rota está coerente. Endereço incompleto ou coordenada 0,0 gera erro operacional.</p>
+      <figure>
+        <img src="tutorial-assets/renders/03-novo-chamado-rota.png" alt="Render real da tela de novo chamado e rota">
+        <figcaption>Tela de novo chamado. O preenchimento correto aqui evita retrabalho no motorista e no financeiro.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>4. Assistente IA para seguradoras</h2>
+      <p>Use quando chegar texto grande de portal, e-mail, WhatsApp ou PDF convertido. Cole o acionamento completo e clique para gerar rascunho. A IA ajuda, mas Gabriela continua responsável por revisar.</p>
+      <h3>Como usar sem erro</h3>
+      <ol>
+        <li>Cole o texto completo da seguradora, incluindo origem, destino, placa, protocolo, tarifas e observações.</li>
+        <li>Clique em <b>Gerar rascunhos</b>.</li>
+        <li>Revise se origem e destino não foram misturados.</li>
+        <li>Confira valor oficial, tarifas e status externo.</li>
+        <li>Depois de revisar, crie o chamado oficial.</li>
+      </ol>
+      <p class="danger">Se o portal externo vier como "Finalizado", isso não significa finalizar internamente. O sistema guarda isso como status externo para conferência.</p>
+      <figure>
+        <img src="tutorial-assets/renders/04-assistente-ia.png" alt="Render real do Assistente IA">
+        <figcaption>Assistente IA: ele acelera a digitação, mas a revisão humana é obrigatória antes de salvar.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>5. Mapa, rota e Tracker RAFA</h2>
+      <p>O mapa serve para enxergar posição, rota, rastreador e GPS do celular quando habilitado. Se a rota não calcular, revise os endereços e links do Maps/Waze antes de culpar o motorista.</p>
+      <div class="grid">
+        <div class="task"><strong>Quando usar</strong>Durante despacho, acompanhamento de atendimento e conferência de rota.</div>
+        <div class="task"><strong>O que observar</strong>Origem, destino, veículo escolhido, motorista, distância, pedágio e status do rastreador.</div>
+      </div>
+      <figure>
+        <img src="tutorial-assets/renders/05-mapa-tracker.png" alt="Render real do mapa e Tracker RAFA">
+        <figcaption>Mapa/Tracker: use para acompanhar a frota, mas confirme dados do chamado quando a rota parecer estranha.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>6. Evidências do motorista</h2>
+      <p>Gabriela deve cobrar do motorista evidências completas. Isso protege a empresa contra contestação da seguradora, cliente e financeiro.</p>
+      <h3>O motorista deve enviar</h3>
+      <ul>
+        <li>Fotos antes da retirada: frente, traseira, laterais e painel/odômetro.</li>
+        <li>Fotos do veículo carregado e fotos na entrega.</li>
+        <li>Registro de avarias, acessórios, combustível, pneus e chaves/documentos.</li>
+        <li>Assinatura do cliente ou justificativa clara quando não houver assinatura.</li>
+        <li>Áudios ou observações quando precisar explicar algo importante.</li>
+      </ul>
+      <p class="warn">Não finalize chamado com evidência incompleta sem autorização e justificativa.</p>
+      <figure>
+        <img src="tutorial-assets/renders/07-evidencias-motorista.png" alt="Render real do checklist e evidências do motorista">
+        <figcaption>Painel do motorista: Gabriela não preenche por ele, mas precisa conferir se foi feito antes de fechar.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>7. Financeiro e fechamento</h2>
+      <p>Depois que o atendimento terminou, confira se o chamado tem valor, despesas, pedágio e evidências. O fechamento só deve seguir quando o atendimento estiver coerente.</p>
+      <div class="checklist">
+        <div><span class="yes">Pode fechar</span><br>Valor correto, evidências completas e status final conferido.</div>
+        <div><span class="warn">Segurar</span><br>Falta foto, assinatura, rota, despesa ou valor de pedágio.</div>
+        <div><span class="danger">Não fechar</span><br>Motorista errado, endereço duvidoso, chamado sem prova ou cliente contestando.</div>
+      </div>
+      <figure>
+        <img src="tutorial-assets/renders/06-financeiro.png" alt="Render real do financeiro e fechamento">
+        <figcaption>Financeiro: o chamado operacional precisa estar correto para não gerar cobrança errada.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>Problemas comuns e o que verificar</h2>
+      <div class="grid">
+        <div class="task">
+          <strong>Motorista não vê chamado</strong>
+          Confira se o chamado tem motorista correto, veículo correto e se o motorista está logado na conta certa.
+        </div>
+        <div class="task">
+          <strong>Rota não calcula</strong>
+          Revise origem/destino, link compartilhado, coordenadas e se o endereço está no Brasil.
+        </div>
+        <div class="task">
+          <strong>Foto ou áudio não aparece</strong>
+          Confira internet do celular, permissão de arquivo/câmera e configuração Cloudinary.
+        </div>
+        <div class="task">
+          <strong>Valor parece errado</strong>
+          Não sobrescreva no automático. Confira preço manual, sugestão, km, ida/volta, franquia e pedágio.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Checklist final de cada chamado</h2>
+      <ol>
+        <li>Cliente, seguradora, protocolo e placa conferidos.</li>
+        <li>Origem e destino conferidos no mapa.</li>
+        <li>Veículo da frota e motorista definidos.</li>
+        <li>Valor, km e pedágio revisados.</li>
+        <li>Motorista recebeu o chamado e iniciou atendimento.</li>
+        <li>Fotos, avarias, assinatura, áudios e despesas conferidos.</li>
+        <li>Status final aplicado somente depois da prova completa.</li>
+        <li>Financeiro/faturamento revisado.</li>
+      </ol>
+      <p class="print-note"><b>Frase de controle:</b> "Chamado bom é chamado com rota certa, motorista certo, valor certo e prova completa."</p>
+    </section>
+  </main>
+</body>
+</html>
